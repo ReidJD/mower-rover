@@ -1,0 +1,21 @@
+# yard_mapper — Python dependencies
+# Install inside a venv: pip install -r requirements.txt
+
+# GPIO / PWM for servo control
+gpiozero>=2.0
+RPi.GPIO>=0.7.1         # gpiozero backend on Pi
+
+# Adafruit CircuitPython stack for BNO055 IMU
+# NOTE: The ordered part (ASIN B0D47G672B) is a BNO055, not BNO085.
+adafruit-blinka>=8.0    # CircuitPython compatibility layer for Pi
+adafruit-circuitpython-bno055>=3.4
+
+# Serial communication (lidar, and later GPS)
+pyserial>=3.5
+
+# Data / post-processing (Phase 4 — install on laptop, not required on Pi)
+# pandas>=2.0
+# numpy>=1.24
+# scipy>=1.11
+# matplotlib>=3.7
+# plotly>=5.18
