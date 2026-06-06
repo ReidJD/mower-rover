@@ -10,12 +10,14 @@ echo "==> Updating package lists..."
 sudo apt-get update -qq
 
 echo "==> Installing system dependencies..."
+# libgpiod2 (Bullseye) was renamed to libgpiod3 in Bookworm — install whichever exists
+GPIOD_PKG=$(apt-cache show libgpiod3 &>/dev/null && echo libgpiod3 || echo libgpiod2)
 sudo apt-get install -y -qq \
     python3-pip \
     python3-venv \
     python3-dev \
     i2c-tools \
-    libgpiod2 \
+    "${GPIOD_PKG}" \
     git
 
 # ── Enable UART and I2C via raspi-config non-interactively ──────────────────
@@ -42,7 +44,7 @@ echo "==> Checking I2C bus..."
 if i2cdetect -y 1 2>/dev/null | grep -q "[0-9a-f][0-9a-f]"; then
     echo "    I2C devices found."
 else
-    echo "    No I2C devices detected yet (normal if BNO085 not wired up)."
+    echo "    No I2C devices detected yet (normal if BNO055 not wired up)."
 fi
 
 echo ""
