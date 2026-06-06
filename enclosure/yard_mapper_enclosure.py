@@ -2,10 +2,17 @@
 yard_mapper_enclosure.py — Parametric CadQuery design for yard mapper hardware.
 
 Generates 4 parts:
-  enclosure_body.stl  — box that holds Raspberry Pi 4 + BNO055 IMU
-  enclosure_lid.stl   — lid with sealing lip; secured by 4× M3 screws into top flange
-  servo_bracket.stl   — clamps to mower frame tube; positions MG996R servo
-  lidar_arm.stl       — attaches TFmini-S lidar to servo horn
+  enclosure_body.stl   — box that holds Raspberry Pi 4 + BNO055 IMU
+  enclosure_lid.stl    — lid with sealing lip; secured by 4× M3 screws into top flange
+  servo_mount.stl      — plate that bolts to enclosure bottom; holds MG996R shaft-down
+  lidar_arm.stl        — attaches to servo horn; holds TFmini-S lens pointing down
+
+SCANNING GEOMETRY:
+  The enclosure mounts horizontally on the rear of the mower (saddle clamps on
+  mower rail). The servo mount plate hangs below the enclosure with the MG996R
+  output shaft pointing straight down. The lidar arm rotates in a horizontal plane
+  ±60°, always pointing the TFmini-S lens straight at the ground. As the mower
+  moves forward, successive sweeps build up parallel cross-track profiles.
 
 HOW TO USE IN CQ-EDITOR:
   1. Download CQ-editor: https://github.com/CadQuery/CQ-editor/releases
@@ -18,29 +25,35 @@ COMMAND-LINE EXPORT (generates all 4 STL files):
   python yard_mapper_enclosure.py
 
 HARDWARE NOTES:
-  Pi standoffs   — tap M2.5; secure Pi with M2.5×6 screws from below
-  Lid flange     — tap M3 into flange holes; use M3×10 pan-head screws
-                   apply 3 mm foam weatherstrip tape to the sealing lip
-  USB-C power    — DWEII panel-mount USB-C (ASIN B0C7CPYL79) in 9 mm round hole
-                   outside: buck converter USB-C cable plugs in
-                   inside: 2-wire pigtail → GPIO pin 4 (5V) and pin 6 (GND)
-  Cable glands   — 2× PG7 metric gland on the same short wall
-                   PG7 fits cables 3–6.5 mm diameter; M12 threaded body
-                   thread gland from outside, tighten nut from inside
-  BNO055 mount   — 2× M2 screws into the printed standoffs on the shelf
-  Bottom mounts  — 4× M5 holes for standard pipe saddle clamps (hardware store)
-  Servo clamp    — M6×50 hex bolt + nut; snug, not overtight (cracks plastic)
-  Lidar arm      — M2.5×6 screws through horn holes; M3×8 screws for lidar
+  Pi standoffs    — tap M2.5; secure Pi with M2.5×6 screws from below
+  Lid flange      — tap M3 into flange holes; use M3×10 pan-head screws
+                    apply 3 mm foam weatherstrip tape to the sealing lip
+  USB-C power     — DWEII panel-mount USB-C (ASIN B0C7CPYL79) in 9 mm round hole
+                    outside: buck converter USB-C cable plugs in
+                    inside: 2-wire pigtail → GPIO pin 4 (5V) and pin 6 (GND)
+  Cable glands    — 2× PG7 metric gland on the same short wall
+                    PG7 fits cables 3–6.5 mm diameter; M12 threaded body
+                    thread gland from outside, tighten nut from inside
+                    Gland Y=0: servo signal + lidar UART cables (bundled)
+                    Gland Y=+22: spare → RTK GPS UART in Phase 2
+  BNO055 mount    — 2× M2 screws into the printed standoffs on the shelf
+  Bottom mounts   — 4× M5 holes for standard pipe saddle clamps (hardware store)
+  Servo mount     — 4× M3×8 screws through plate into enclosure bottom (tapped);
+                    2× M4×16 screws through plate into MG996R mounting tabs
+  Lidar arm       — press arm hub onto servo horn; 2× M2.5×6 screws to secure;
+                    2× M2×8 screws through arm into TFmini-S mounting holes
+  Cable routing   — TFmini-S cable exits upward, loops with ~100 mm slack near
+                    the servo shaft to accommodate ±60° sweep, then enters gland
 
 PRINT SETTINGS:
   Material: PETG (recommended) or ASA (better UV resistance for outdoor use)
   Layer height: 0.2 mm  |  Walls: 4 perimeters  |  Top/bottom: 5 layers
-  Infill: 40% for bracket + lidar arm, 20% for enclosure walls and lid
+  Infill: 40% for servo mount + lidar arm, 20% for enclosure walls and lid
   Orientation:
     enclosure_body  — open top face UP on print bed
     enclosure_lid   — flat top face DOWN on print bed (lip points UP while printing)
-    servo_bracket   — clamp face down, arm extending up
-    lidar_arm       — flat face down
+    servo_mount     — flat (enclosure-side) face DOWN on print bed
+    lidar_arm       — flat (servo-side) face DOWN on print bed
 """
 
 import cadquery as cq
@@ -137,30 +150,42 @@ MOUNT_HOLE_D = 5.2      # M5 clearance
 MOUNT_HOLE_X = EXT_W / 2 - WALL - 4.0    # ±X positions of hole pairs
 MOUNT_HOLE_Y = EXT_D / 2 - WALL - 4.0    # ±Y positions
 
-# ── MG996R servo ─────────────────────────────────────────────────────────────
-SERVO_FLANGE_SPAN = 47.5    # mounting hole C-C along flange
-SERVO_HOLE_D      = 4.3     # M4 clearance
+# ── MG996R servo body dimensions ─────────────────────────────────────────────
+SERVO_BODY_L      = 40.7    # body length (long axis)
+SERVO_BODY_W      = 19.7    # body width
+SERVO_FLANGE_SPAN = 47.5    # mounting tab hole C-C along body long axis
+SERVO_HOLE_D      = 4.3     # M4 clearance for tab mounting screws
 
-# ── Servo bracket ─────────────────────────────────────────────────────────────
-TUBE_OD       = 38.1    # ← SET THIS to your mower frame tube outer diameter (mm)
-                         #   1 inch = 25.4,  1.5 inch = 38.1,  2 inch = 50.8
-CLAMP_WALL_T  = 5.0     # C-clamp wall thickness
-ARM_LEN       = 70.0    # arm length: clamp centre → servo platform
-ARM_W         = 28.0    # arm width
-ARM_T         = 8.0     # arm thickness
-PLATFORM_SIDE = 58.0    # servo mounting platform (square)
-PLATFORM_T    = 5.0     # platform thickness
-CLAMP_BOLT_D  = 6.5     # M6 clearance
+# ── Servo mount plate (Part 3) ────────────────────────────────────────────────
+# Flat plate that bolts to the enclosure bottom face, holding the MG996R body
+# with its output shaft pointing straight down.
+SMOUNT_L          = 76.0    # plate length (aligned with servo body long axis)
+SMOUNT_W          = 38.0    # plate width (across servo body)
+SMOUNT_T          = 5.0     # plate thickness
+SMOUNT_POCKET_L   = 41.5    # locating pocket for servo body (40.7 + 0.8 clearance)
+SMOUNT_POCKET_W   = 20.5    # locating pocket for servo body (19.7 + 0.8 clearance)
+SMOUNT_POCKET_D   = 2.5     # pocket depth (locates body; servo tabs rest on plate)
+SMOUNT_SHAFT_D    = 13.0    # through-hole for servo shaft + horn base clearance
+SMOUNT_SCREW_D    = 3.2     # M3 clearance: bolts plate to enclosure bottom
+SMOUNT_SCREW_INS  = 7.0     # M3 hole inset from plate edge
 
 # ── Lidar arm (TFmini-S ↔ servo horn adapter) ─────────────────────────────────
-LIDAR_HOLE_SPACING = 31.0   # M3 hole C-C on TFmini-S
-LIDAR_HOLE_D       = 3.2    # M3 clearance
+# The arm attaches to the servo horn at one end and holds the TFmini-S
+# at the other end with the lens pointing STRAIGHT DOWN.
+# TFmini-S body: 42 mm L × 15 mm W × 16 mm H. Lens on the bottom when mounted.
+# Cable exits from the rear (short end), routes along the arm back to the gland.
+# ⚠ Verify LIDAR_HOLE_SPACING against your specific TFmini-S unit before printing.
+LIDAR_HOLE_SPACING = 36.0   # M2 mounting hole C-C on TFmini-S back face (verify!)
+LIDAR_HOLE_D       = 2.2    # M2 clearance
+LIDAR_BODY_L       = 42.0   # TFmini-S body length
+LIDAR_BODY_W       = 15.0   # TFmini-S body width
+LIDAR_BODY_H       = 16.0   # TFmini-S body height
 HORN_HUB_D         = 6.3    # servo horn centre hub OD (+ 0.3 mm clearance)
-HORN_SCREW_SPACING = 16.0   # horn outer screw C-C
+HORN_SCREW_SPACING = 16.0   # horn screw C-C (4-arm cross horn, inner hole pair)
 HORN_SCREW_TAP     = 2.7    # M2.5 tap
-ARM_PLATE_T        = 4.0    # plate thickness
-ARM_PLATE_W        = 50.0   # plate width
-ARM_PLATE_L        = 55.0   # plate length
+ARM_PLATE_T        = 4.0    # arm plate thickness
+ARM_PLATE_W        = 50.0   # arm plate width (must span LIDAR_HOLE_SPACING + walls)
+ARM_PLATE_L        = 65.0   # arm plate length: servo shaft centre → TFmini-S centre
 
 
 # =============================================================================
@@ -297,7 +322,7 @@ for gy in GLAND_Y_POS:
     enc = enc.cut(cyl_x(GLAND_HOLE_D / 2, boss_x_length + 1,
                           x=boss_x_start - 0.5, y=gy, z=GLAND_Z))
 
-# ── Bottom mounting holes ─────────────────────────────────────────────────────
+# ── Bottom mounting holes (saddle clamps to mower rail) ───────────────────────
 # Four M5 clearance holes for pipe saddle clamp bolts.
 # Saddle clamps (available at any hardware store) attach the enclosure to the frame tube.
 for (mx, my) in [
@@ -307,6 +332,17 @@ for (mx, my) in [
     ( MOUNT_HOLE_X,  MOUNT_HOLE_Y),
 ]:
     enc = enc.cut(cyl_z(MOUNT_HOLE_D / 2, WALL + 1, mx, my, -0.5))
+
+# ── Bottom mounting holes (servo mount plate) ────────────────────────────────
+# Four M3 tapped holes to receive the servo mount plate (Part 3).
+# The plate is centred under the enclosure; holes are inset from plate edges.
+smount_hx = SMOUNT_L / 2 - SMOUNT_SCREW_INS   # ±31 mm
+smount_hy = SMOUNT_W / 2 - SMOUNT_SCREW_INS   # ±12 mm
+for (sx, sy) in [
+    (-smount_hx, -smount_hy), (-smount_hx, +smount_hy),
+    (+smount_hx, -smount_hy), (+smount_hx, +smount_hy),
+]:
+    enc = enc.cut(cyl_z(SMOUNT_SCREW_D / 2, WALL + 1, sx, sy, -0.5))
 
 print(f"  Body: {EXT_W:.1f}W × {EXT_D:.1f}D × {EXT_H + FLANGE_T:.1f}H mm (inc. flange)")
 print(f"  Cavity: {INT_W:.1f}W × {INT_D:.1f}D × {INT_H:.1f}H mm")
@@ -349,117 +385,143 @@ print(f"  Lid: {lid_w:.1f}W × {lid_d:.1f}D mm, lip depth {LIP_DEPTH:.1f} mm")
 
 
 # =============================================================================
-# PART 3: SERVO BRACKET
+# PART 3: SERVO MOUNT PLATE
 #
-# Clamps to a vertical ROPS tube. A horizontal arm positions the servo so its
-# output shaft points in the direction of travel (fore–aft axis of the mower).
-# This makes the lidar sweep left–right across the mower path (cross-track scan).
+# Flat plate that bolts flush to the underside of the enclosure.
+# The MG996R servo body seats into a locating pocket with its output shaft
+# pointing straight down through a clearance hole. The servo mounting tabs
+# (which have M4 holes at SERVO_FLANGE_SPAN C-C) rest on the plate surface
+# and are secured with M4×16 screws from below.
 #
-# Origin: centre of tube bore, at midheight of clamp body.
+# Four M3 clearance holes at the plate corners bolt up into the tapped holes
+# in the enclosure bottom face.
+#
+# Origin: centre of plate top face at Z = 0.
+#         Plate extends downward (−Z). Servo shaft exits at Z = −SMOUNT_T.
 # =============================================================================
 
-print("Building servo bracket...")
+print("Building servo mount plate...")
 
-clamp_r = TUBE_OD / 2 + CLAMP_WALL_T
-clamp_h = TUBE_OD + 2 * CLAMP_WALL_T
+# ── Base plate ────────────────────────────────────────────────────────────────
+servo_mount = box_z(SMOUNT_L, SMOUNT_W, SMOUNT_T, z=-SMOUNT_T)
 
-# ── C-clamp body ──────────────────────────────────────────────────────────────
-clamp = box_z(clamp_r, clamp_h, clamp_r * 2, z=-clamp_r)
-# Bore for tube (+ 0.3 mm radial clearance for slip fit)
-clamp = clamp.cut(cyl_z(TUBE_OD / 2 + 0.3, clamp_r * 2 + 2, z=-clamp_r - 1))
-# Front slit so the clamp can flex open to accept the tube
-slit_w = TUBE_OD * 0.60
-clamp = clamp.cut(box_z(clamp_r + 1, slit_w, clamp_r * 2 + 2,
-                         x=-(clamp_r + 1) / 2, z=-clamp_r - 1))
-
-# Clamp bolt holes through the top and bottom ears (M6, axis along Y)
-ear_x  = clamp_r / 2
-for ez in [TUBE_OD / 2 + CLAMP_WALL_T / 2, -(TUBE_OD / 2 + CLAMP_WALL_T / 2)]:
-    bolt = cq.Solid.makeCylinder(
-        radius=CLAMP_BOLT_D / 2, height=clamp_h + 2,
-        pnt=cq.Vector(-ear_x, -clamp_h / 2 - 1, ez),
-        dir=cq.Vector(0, 1, 0),
-    )
-    clamp = clamp.cut(cq.Workplane("XY").add(bolt))
-
-# ── Horizontal arm ────────────────────────────────────────────────────────────
-arm = box_z(ARM_LEN, ARM_W, ARM_T, x=ARM_LEN / 2, z=-ARM_T / 2)
-bracket = clamp.union(arm)
-
-# ── Servo mounting platform at arm end ────────────────────────────────────────
-plat_cx = ARM_LEN + PLATFORM_SIDE / 2 - CLAMP_WALL_T
-platform = box_z(PLATFORM_SIDE, PLATFORM_SIDE, PLATFORM_T,
-                 x=plat_cx, z=-ARM_T / 2 - PLATFORM_T)
-# Servo flange holes (2× M4 along Y at SERVO_FLANGE_SPAN C-C)
-for sy in [-SERVO_FLANGE_SPAN / 2, SERVO_FLANGE_SPAN / 2]:
-    platform = platform.cut(
-        cyl_z(SERVO_HOLE_D / 2, PLATFORM_T + 2,
-              x=plat_cx, y=sy, z=-ARM_T / 2 - PLATFORM_T - 1)
-    )
-bracket = bracket.union(platform)
-
-# ── Gusset triangle for arm rigidity ──────────────────────────────────────────
-gusset = (
-    cq.Workplane("XZ")
-    .moveTo(ARM_LEN - 20, -ARM_T / 2)
-    .lineTo(ARM_LEN + 5,  -ARM_T / 2)
-    .lineTo(ARM_LEN + 5,  -ARM_T / 2 - PLATFORM_T - 18)
-    .close()
-    .extrude(ARM_W, both=True)
+# ── Locating pocket for servo body (top face) ────────────────────────────────
+# The servo body drops into this pocket; the tabs sit proud on the plate surface.
+servo_mount = servo_mount.cut(
+    box_z(SMOUNT_POCKET_L, SMOUNT_POCKET_W, SMOUNT_POCKET_D + 0.5, z=-SMOUNT_POCKET_D - 0.5)
 )
-bracket = bracket.union(gusset)
 
-print(f"  Bracket: arm {ARM_LEN:.0f} mm, clamp fits tube OD {TUBE_OD:.1f} mm")
-print(f"  → Change TUBE_OD parameter to match your mower frame tube.")
+# ── Servo shaft clearance hole (centre of plate) ─────────────────────────────
+servo_mount = servo_mount.cut(
+    cyl_z(SMOUNT_SHAFT_D / 2, SMOUNT_T + 2, z=-SMOUNT_T - 1)
+)
+
+# ── M4 servo tab holes (through plate, along plate long axis) ─────────────────
+for tx in [-SERVO_FLANGE_SPAN / 2, SERVO_FLANGE_SPAN / 2]:
+    servo_mount = servo_mount.cut(
+        cyl_z(SERVO_HOLE_D / 2, SMOUNT_T + 2, x=tx, z=-SMOUNT_T - 1)
+    )
+
+# ── M3 holes to bolt plate to enclosure bottom (corner positions) ─────────────
+for (sx, sy) in [
+    (-smount_hx, -smount_hy), (-smount_hx, +smount_hy),
+    (+smount_hx, -smount_hy), (+smount_hx, +smount_hy),
+]:
+    servo_mount = servo_mount.cut(
+        cyl_z(SMOUNT_SCREW_D / 2, SMOUNT_T + 2, x=sx, y=sy, z=-SMOUNT_T - 1)
+    )
+
+# ── Chamfer plate edges for printability ──────────────────────────────────────
+try:
+    servo_mount = servo_mount.edges("|Z").fillet(2.5)
+except Exception:
+    pass
+
+print(f"  Servo mount plate: {SMOUNT_L:.0f}L × {SMOUNT_W:.0f}W × {SMOUNT_T:.0f}T mm")
+print(f"  Shaft hole: {SMOUNT_SHAFT_D:.0f} mm dia  |  Tab holes: M4 at ±{SERVO_FLANGE_SPAN/2:.1f} mm")
 
 
 # =============================================================================
 # PART 4: LIDAR ARM
 #
-# Flat plate: one end attaches to the servo horn (hub + 2× M2.5 screw),
-# other end holds the TFmini-S (2× M3 screw into 1.5 mm deep locating pocket).
-# The lidar lens faces away from the plate when the arm is at nadir (0°).
+# Flat plate that rotates with the servo horn. The pivot end has a hub clearance
+# hole and 2× M2.5 tap holes for the servo horn screws. The far end has a
+# recessed cradle that the TFmini-S nestles into from below, lens pointing DOWN,
+# secured by 2× M2 screws from the top of the arm.
 #
-# Origin: servo shaft axis at Y = 0 (pivot end), plate extends in +Y.
+# At nadir (servo 0°) the arm is horizontal and the TFmini-S lens aims straight
+# at the ground. As the servo sweeps ±60° the arm rotates in the horizontal
+# plane — the lens always points down, scanning a cross-track arc.
+#
+# Cable routing: TFmini-S cable exits toward the pivot end, runs along the
+# top of the arm, loops ~100 mm at the servo shaft (slack for sweep), then
+# enters the enclosure through the PG7 gland at Y = 0.
+#
+# Origin: servo shaft axis at (0, 0, 0). Plate extends from Y = −10 (behind
+#         shaft) to Y = +ARM_PLATE_L. Top face of arm plate at Z = 0.
 # =============================================================================
 
 print("Building lidar arm...")
 
-lidar_arm = box_z(ARM_PLATE_W, ARM_PLATE_L, ARM_PLATE_T)
+# The plate extends slightly behind the shaft for horn-screw access
+arm_y_start = -10.0
+arm_y_end   = ARM_PLATE_L
 
-# Servo horn hub clearance (centre of pivot end)
+lidar_arm = box_z(ARM_PLATE_W, arm_y_end - arm_y_start, ARM_PLATE_T,
+                  y=(arm_y_start + arm_y_end) / 2, z=-ARM_PLATE_T)
+
+# ── Servo horn attachment (pivot end) ────────────────────────────────────────
+# Hub clearance hole — servo horn centre hub fits through here
 lidar_arm = lidar_arm.cut(
-    cyl_z(HORN_HUB_D / 2, ARM_PLATE_T + 2, x=0, y=-ARM_PLATE_L / 2, z=-1)
+    cyl_z(HORN_HUB_D / 2, ARM_PLATE_T + 2, x=0, y=0, z=-ARM_PLATE_T - 1)
 )
-# 2× M2.5 tap holes for horn screws
+# 2× M2.5 tap holes (inner pair on a 4-arm cross horn, along X axis)
 for hx in [-HORN_SCREW_SPACING / 2, HORN_SCREW_SPACING / 2]:
     lidar_arm = lidar_arm.cut(
-        cyl_z(HORN_SCREW_TAP / 2, ARM_PLATE_T + 2, x=hx, y=-ARM_PLATE_L / 2, z=-1)
+        cyl_z(HORN_SCREW_TAP / 2, ARM_PLATE_T + 2, x=hx, y=0, z=-ARM_PLATE_T - 1)
     )
 
-# Lidar locating pocket (1.5 mm deep; prevents rotation)
-lidar_cy = ARM_PLATE_L / 2 - 14.0
+# ── TFmini-S cradle (far end) ─────────────────────────────────────────────────
+# The TFmini-S body (42×15×16 mm) sits in a shallow pocket in the BOTTOM face
+# of the arm, lens pointing down. The cradle prevents lateral movement.
+# M2 screws from the TOP of the arm pass through and thread into the sensor.
+lidar_cy = ARM_PLATE_L   # Y position of TFmini-S centre
+
+# Shallow locating pocket in bottom face (1.5 mm deep, body footprint + 0.5 clearance)
 lidar_arm = lidar_arm.cut(
-    box_z(32.0 + 0.5, 15.0 + 0.5, 1.5, y=lidar_cy, z=ARM_PLATE_T - 1.5)
+    box_z(LIDAR_BODY_L + 0.5, LIDAR_BODY_W + 0.5, 1.5 + 0.5,
+          y=lidar_cy, z=-ARM_PLATE_T - 0.5)
 )
-# 2× M3 clearance holes for lidar mounting screws
+
+# 2× M2 clearance holes for mounting screws (top to bottom, at LIDAR_HOLE_SPACING C-C)
 for lx in [-LIDAR_HOLE_SPACING / 2, LIDAR_HOLE_SPACING / 2]:
     lidar_arm = lidar_arm.cut(
-        cyl_z(LIDAR_HOLE_D / 2, ARM_PLATE_T + 2, x=lx, y=lidar_cy, z=-1)
+        cyl_z(LIDAR_HOLE_D / 2, ARM_PLATE_T + 2, x=lx, y=lidar_cy, z=-ARM_PLATE_T - 1)
     )
 
-# Stiffening ribs on back face
-for ry in [-ARM_PLATE_L * 0.15, ARM_PLATE_L * 0.15]:
-    lidar_arm = lidar_arm.union(
-        box_z(ARM_PLATE_W, 3.5, ARM_PLATE_T + 5.0, y=ry)
-    )
+# ── Cable channel on top face ────────────────────────────────────────────────
+# Shallow groove that guides the TFmini-S cable from the sensor end toward pivot.
+# Cable sits in groove and is zip-tied at two points to keep it tidy.
+lidar_arm = lidar_arm.cut(
+    box_z(4.0, ARM_PLATE_L - 20.0, 1.5 + 0.5,
+          y=(arm_y_start + ARM_PLATE_L - 20.0) / 2 + 10, z=-1.5 - 0.5)
+)
 
+# ── Stiffening rib along the length (underside, centre) ──────────────────────
+rib_h = 4.0
+lidar_arm = lidar_arm.union(
+    box_z(5.0, arm_y_end - arm_y_start - 30.0, rib_h,
+          y=(arm_y_start + arm_y_end) / 2, z=-ARM_PLATE_T - rib_h)
+)
+
+# Round corners
 try:
     lidar_arm = lidar_arm.edges("|Z").fillet(2.0)
 except Exception:
     pass
 
-print(f"  Lidar arm: {ARM_PLATE_W:.0f}W × {ARM_PLATE_L:.0f}L mm")
+print(f"  Lidar arm: {ARM_PLATE_W:.0f}W × {ARM_PLATE_L + 10:.0f}L mm  "
+      f"(pivot→sensor: {ARM_PLATE_L:.0f} mm)")
 
 
 # =============================================================================
@@ -469,7 +531,7 @@ print(f"  Lidar arm: {ARM_PLATE_W:.0f}W × {ARM_PLATE_L:.0f}L mm")
 if __name__ == "__main__":
     out = os.path.dirname(os.path.abspath(__file__))
     for name, part in [("enclosure_body", enc), ("enclosure_lid", lid),
-                        ("servo_bracket", bracket), ("lidar_arm", lidar_arm)]:
+                        ("servo_mount", servo_mount), ("lidar_arm", lidar_arm)]:
         path = os.path.join(out, f"{name}.stl")
         cq.exporters.export(part, path)
         print(f"Exported: {path}")
@@ -477,7 +539,8 @@ if __name__ == "__main__":
 
 # =============================================================================
 # CQ-EDITOR — edit show_object() calls to preview different parts.
-# Show body + lid together by default (position lid above body for clarity).
+# Default: enclosure body + lid floated above.
+# Uncomment servo_mount / lidar_arm lines to preview the scanning assembly.
 # =============================================================================
 
 show_object(enc,
@@ -488,6 +551,10 @@ show_object(lid.translate((0, 0, EXT_H + FLANGE_T + 5)),  # float lid above body
             name="enclosure_lid",
             options={"color": "#5aaa6a", "alpha": 0.85})
 
-# Uncomment to preview other parts:
-# show_object(bracket,   name="servo_bracket",  options={"color": "#bf8c3a"})
-# show_object(lidar_arm, name="lidar_arm",       options={"color": "#bf3a6e"})
+# Uncomment to preview servo mount plate (hangs below enclosure body):
+# show_object(servo_mount.translate((0, 0, -SMOUNT_T - 2)),
+#             name="servo_mount", options={"color": "#bf8c3a", "alpha": 0.9})
+
+# Uncomment to preview lidar arm (positioned below servo mount):
+# show_object(lidar_arm.translate((0, 0, -SMOUNT_T - 20)),
+#             name="lidar_arm", options={"color": "#bf3a6e", "alpha": 0.9})
