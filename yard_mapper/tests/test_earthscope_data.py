@@ -26,7 +26,7 @@ ARCHIVE_BASE = "https://gage-data.earthscope.org/archive/gnss"
 
 VARIANTS = [
     ("RINEX3", "rinex3/obs", lambda sta, yr, doy:
-        f"{sta.upper()}00USA_R_{yr}{doy:03d}0000_01D_30S_MO.crx.gz"),
+        f"{sta.upper()}00USA_R_{yr}{doy:03d}0000_01D_15S_MO.crx.gz"),
     ("RINEX2", "rinex/obs",  lambda sta, yr, doy:
         f"{sta.lower()}{doy:03d}0.{str(yr)[-2:]}o.gz"),
 ]
