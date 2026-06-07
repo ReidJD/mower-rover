@@ -55,7 +55,7 @@ def find_file(client, station: str, dates: list[datetime.date]) -> tuple[str, st
             url   = f"{ARCHIVE_BASE}/{subpath}/{yr}/{day:03d}/{fname}"
             print(f"  {d} (DOY {day:03d})  {fname}  ", end="", flush=True)
             try:
-                resp = client.get(url)
+                resp = client.ctx.httpx_client.get(url)
                 if resp.status_code == 200:
                     print(f"HTTP 200 ✓")
                     return url, fname
@@ -131,7 +131,7 @@ def main():
         if args.download:
             print(f"  Downloading {fname} ...", end=" ", flush=True)
             try:
-                resp = client.get(url)
+                resp = client.ctx.httpx_client.get(url)
                 resp.raise_for_status()
                 with open(fname, "wb") as f:
                     f.write(resp.content)
